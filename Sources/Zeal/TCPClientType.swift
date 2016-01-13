@@ -1,4 +1,4 @@
-// HTTPSerializer.swift
+// TCPClientType.swift
 //
 // The MIT License (MIT)
 //
@@ -22,22 +22,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import URI
-import HTTP
+import Core
 
-struct HTTPSerializer: HTTPRequestSerializerType {
-    func serializeRequest(client: TCPStreamType, request: HTTPRequest, completion: (Void throws -> Void) -> Void) {
-        var string = "\(request.method) \(request.uri) HTTP/\(request.majorVersion).\(request.minorVersion)\r\n"
-
-        for (name, value) in request.headers {
-            string += "\(name): \(value)\r\n"
-        }
-
-        string += "\r\n"
-
-        var data = string.utf8.map { Int8($0) }
-        data += request.body
-
-        client.send(data, completion: completion)
-    }
+public protocol TCPClientType {
+    var host: String { get }
+    var port: Int { get }
+    func connect(completion: (Void throws -> StreamType) -> Void)
+    func stop()
 }

@@ -1,4 +1,4 @@
-// TCPClient.swift
+// HTTPRequestSerializerType.swift
 //
 // The MIT License (MIT)
 //
@@ -22,23 +22,9 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import TCPIP
-import GrandCentralDispatch
+import Core
+import HTTP
 
-struct TCPClient: TCPClientType {
-    let host: String
-    let port: Int
-
-    func connect(completion: (Void throws -> TCPStreamType) -> Void) {
-        defaultQueue.async {
-            do {
-                let ip = try IP(address: self.host, port: self.port)
-                let socket = try TCPClientSocket(ip: ip)
-                let stream = TCPStream(socket: socket)
-                completion({ stream })
-            } catch {
-                completion({ throw error })
-            }
-        }
-    }
+public protocol HTTPRequestSerializerType {
+    func serializeRequest(client: StreamType, request: Request, completion: (Void throws -> Void) -> Void)
 }

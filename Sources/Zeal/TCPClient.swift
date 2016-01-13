@@ -1,4 +1,4 @@
-// TCPStream.swift
+// TCPClient.swift
 //
 // The MIT License (MIT)
 //
@@ -22,51 +22,45 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import TCPIP
-import GrandCentralDispatch
+import Core
+import Venice
 
-final class TCPStream: TCPStreamType {
-    let socket: TCPClientSocket
-    let channel: IOChannel
+struct TCPClient: TCPClientType {
+    let host: String
+    let port: Int
+    let SSL: SSLClientContextType?
 
-    init(socket: TCPClientSocket) {
-        self.socket = socket
+    private let closeChannel = Channel<Void>()
 
-        channel = IOChannel(type: .Stream, fileDescriptor: socket.fileDescriptor) { result in
-            result.failure { error in
-                print(error)
-            }
-            socket.close()
-        }
+    func connect(completion: (Void throws -> StreamType) -> Void) {
+        do {
+            let ip = try IP(address: self.host, port: self.port)
+            let socket = try TCPClientSocket(ip: ip)
 
-        channel.setLowWater(1)
-    }
+            co {
+                do {
+                    let socketStream = TCPStream(socket: socket)
 
-    func receive(completion: (Void throws -> [Int8]) -> Void) {
-        channel.read { result in
-            result.success { done, data in
-                completion({ data })
-            }
-            result.failure { error in
-                completion({ throw error })
-            }
-        }
-    }
-
-    func send(data: [Int8], completion: (Void throws -> Void) -> Void) {
-        channel.write(data: data) { result in
-            result.success { done, _ in
-                if done {
-                    completion({})
+                    if let SSL = self.SSL {
+                        let SSLStream = try SSL.streamType.init(context: SSL, rawStream: socketStream)
+                        completion({ SSLStream })
+                    }
+                    else {
+                        completion({ socketStream })
+                    }
+                } catch {
+                    completion({ throw error })
+                    self.stop()
                 }
             }
-            result.failure { error in
-                completion({ throw error })
-            }
+            closeChannel.send()
+        }
+        catch {
+            completion({ throw error })
         }
     }
 
-    func close() {
-        channel.close()
+    func stop() {
+        closeChannel.receive()
     }
 }

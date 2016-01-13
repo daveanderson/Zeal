@@ -1,4 +1,4 @@
-// HTTPRequestSerializerType.swift
+// HTTPSerializer.swift
 //
 // The MIT License (MIT)
 //
@@ -22,8 +22,22 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+import Core
 import HTTP
 
-public protocol HTTPRequestSerializerType {
-    func serializeRequest(client: TCPStreamType, request: HTTPRequest, completion: (Void throws -> Void) -> Void)
+struct HTTPSerializer: HTTPRequestSerializerType {
+    func serializeRequest(client: StreamType, request: Request, completion: (Void throws -> Void) -> Void) {
+        var string = "\(request.method) \(request.uri) HTTP/\(request.majorVersion).\(request.minorVersion)\r\n"
+
+        for (name, value) in request.headers {
+            string += "\(name): \(value)\r\n"
+        }
+
+        string += "\r\n"
+
+        var data = string.utf8.map { Int8($0) }
+        data += request.body
+
+        client.send(data, completion: completion)
+    }
 }

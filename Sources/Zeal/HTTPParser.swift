@@ -1,4 +1,4 @@
-// ZealTests.swift
+// HTTPParser.swift
 //
 // The MIT License (MIT)
 //
@@ -22,25 +22,23 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import XCTest
-import Zeal
+import Core
 import HTTP
-import URI
-import GrandCentralDispatch
+import HTTPParser
 
-class ZealTests: XCTestCase {
-    func testExample() {
-        let client = HTTPClient(host: "http://www.google.com.br/?gfe_rd=cr&ei=CDBeVsnAL4OX8QevspGwAg", port: 80)
-
-        client.get("/") { result in
-            do {
-                let response = try result()
-                print(response)
-            } catch {
-                print(error)
-            }
+struct HTTPParser: HTTPResponseParserType {
+    func parseResponse(client: StreamType, completion: (Void throws -> Response) -> Void) {
+        let parser = ResponseParser { response in
+            completion({ response })
         }
 
-        GrandCentralDispatch.main()
+        client.receive { result in
+            do {
+                let data = try result()
+                try parser.parse(data)
+            } catch {
+                completion({ throw error })
+            }
+        }
     }
 }

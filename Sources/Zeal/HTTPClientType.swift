@@ -22,7 +22,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-import URI
+import Core
 import HTTP
 
 public protocol HTTPClientType {
@@ -31,14 +31,16 @@ public protocol HTTPClientType {
     var parser: HTTPResponseParserType { get }
 }
 
+public typealias ResponsePair = (Response, StreamType)
+
 extension HTTPClientType {
-    public func send(request: HTTPRequest, result: (Void throws -> HTTPResponse) -> Void) {
+    public func send(request: Request, result: (Void throws -> ResponsePair) -> Void) {
         client.connect { connectResult in
             do {
                 let stream = try connectResult()
                 var headers = request.headers
                 headers["Host"] = "\(self.client.host):\(self.client.port)"
-                let newRequest = HTTPRequest(
+                let newRequest = Request(
                     method: request.method,
                     uri: request.uri,
                     majorVersion: request.majorVersion,
@@ -51,25 +53,31 @@ extension HTTPClientType {
                         try serializeResult()
                     } catch {
                         result({ throw error })
+                        self.client.stop()
                     }
                 }
                 self.parser.parseResponse(stream) { parseResult in
                     do {
+                        // TODO: Need a similar concept as Responder for request responses, with a context that allows conditionally closing the stream or piping
                         let response = try parseResult()
-                        result({ response })
+                        let pipedStream = stream.pipe()
+                        result({ (response, pipedStream) })
+                        // self.client.stop()
                     } catch {
                         result({ throw error })
+                        self.client.stop()
                     }
                 }
             } catch {
                 result({ throw error })
+                self.client.stop()
             }
         }
     }
 
-    public func delete(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .DELETE,
+    public func delete(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.DELETE,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -77,13 +85,13 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func delete(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func delete(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         delete(uri, headers: headers, body: body.data, result: result)
     }
 
-    public func get(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .GET,
+    public func get(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.GET,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -91,13 +99,13 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func get(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func get(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         get(uri, headers: headers, body: body.data, result: result)
     }
 
-    public func head(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .HEAD,
+    public func head(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.HEAD,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -105,13 +113,13 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func head(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func head(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         head(uri, headers: headers, body: body.data, result: result)
     }
 
-    public func post(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .POST,
+    public func post(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.POST,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -119,13 +127,13 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func post(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func post(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         post(uri, headers: headers, body: body.data, result: result)
     }
 
-    public func put(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .PUT,
+    public func put(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.PUT,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -133,13 +141,13 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func put(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func put(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         put(uri, headers: headers, body: body.data, result: result)
     }
 
-    public func connect(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .CONNECT,
+    public func connect(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.CONNECT,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -147,13 +155,13 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func connect(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func connect(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         connect(uri, headers: headers, body: body.data, result: result)
     }
 
-    public func options(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .OPTIONS,
+    public func options(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.OPTIONS,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -161,13 +169,13 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func options(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func options(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         options(uri, headers: headers, body: body.data, result: result)
     }
 
-    public func trace(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> HTTPResponse) -> Void) {
-        let request = HTTPRequest(
-            method: .TRACE,
+    public func trace(uri: String, headers: [String: String] = [:], body: [Int8] = [], result: (Void throws -> ResponsePair) -> Void) {
+        let request = Request(
+            method: Method.TRACE,
             uri: URI(string: uri),
             headers: headers,
             body: body
@@ -175,7 +183,7 @@ extension HTTPClientType {
         send(request, result: result)
     }
 
-    public func trace(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> HTTPResponse) -> Void) {
+    public func trace(uri: String, headers: [String: String] = [:], body: String, result: (Void throws -> ResponsePair) -> Void) {
         trace(uri, headers: headers, body: body.data, result: result)
     }
 }
